@@ -1,0 +1,619 @@
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Page</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+</head>
+
+<body>
+    <button id="logout_button">Logout</button><br><br>
+    <div class="container">
+        <div class="product-management">
+            <h2>Product Management</h2>
+            <div id="product_list"></div>
+            <form id="product_form">
+                <input type="hidden" id="product_id">
+                <label for="product_name">Product Name:</label><br>
+                <input type="text" id="product_name" name="product_name" required><br>
+                <label for="product_price">Product Price:</label><br>
+                <input type="number" id="product_price" name="product_price" min="1" required><br>
+                <label for="product_stock">Product Stock:</label><br>
+                <input type="number" id="product_stock" name="product_stock" min="1" required><br><br>
+                <button type="submit" id="add_button">Add Product</button>
+                <button type="button" id="update_button" style="display: none;">Update Product</button>
+                <button type="button" id="delete_button" style="display: none;">Delete Product</button>
+                <button type="button" id="refresh_button">Refresh</button>
+            </form>
+        </div>
+    </div>
+    <div class="container">
+        <div class="transaction-management">
+            <h2>Transaction Management</h2>
+            <div id="transaction_list"></div>
+            <button type="button" id="refresh_transactions_button">Refresh Transactions</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="report-management">
+            <h2>Report Management</h2>
+            <form id="report_form">
+                <label for="report_date">Report Date:</label><br>
+                <input type="text" id="report_date" name="report_date" required>
+                <button type="button" id="generate_report_button">Generate Report</button>
+            </form>
+            <div id="report_list"></div>
+        </div>
+    </div>
+
+    <script>
+        fetchProductList();
+
+        document.getElementById('product_form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var product_id = document.getElementById('product_id').value;
+            var product_name = document.getElementById('product_name').value;
+            var product_price = Number(document.getElementById('product_price').value);
+            var product_stock = Number(document.getElementById('product_stock').value);
+
+            if (product_id) {
+                fetch(`http://localhost:8080/product/${product_id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + getTokenFromStorage(),
+                    },
+                    body: JSON.stringify({
+                        "name": product_name,
+                        "price": product_price,
+                        "stock": product_stock,
+                    }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Product updated successfully!');
+                            fetchProductList();
+                        } else {
+                            alert(data.message);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                    });
+            } else {
+                fetch('http://localhost:8080/product', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + getTokenFromStorage(),
+                    },
+                    body: JSON.stringify({
+                        "name": product_name,
+                        "price": product_price,
+                        "stock": product_stock,
+                    }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Product added successfully!');
+                            fetchProductList();
+                        } else {
+                            alert(data.message);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                    });
+            }
+        });
+
+        document.getElementById('product_list').addEventListener('click', function (event) {
+            if (event.target.tagName === 'BUTTON' && event.target.id === 'delete_button') {
+                var productId = event.target.getAttribute('data-product-id');
+                if (confirm('Are you sure you want to delete this product?')) {
+                    deleteProduct(productId);
+                }
+            }
+        });
+
+        function fetchProductList() {
+            fetch('http://localhost:8080/product', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + getTokenFromStorage(),
+                },
+            })
+                .then(response => response.json())
+                .then(products => {
+                    var productList = document.getElementById('product_list');
+                    productList.innerHTML = '';
+
+                    if (products.length > 0) {
+                        var table = document.createElement('table');
+                        table.id = 'product_table';
+                        productList.appendChild(table);
+
+                        var headerRow = table.insertRow();
+                        headerRow.innerHTML = '<th>ID</th><th>Name</th><th>Price</th><th>Stock</th><th>Update</th><th>Delete</th>';
+
+                        var tableBody = document.createElement('tbody');
+                        tableBody.id = 'product_table_body';
+                        table.appendChild(tableBody);
+
+                        products.forEach(product => {
+                            var row = tableBody.insertRow();
+                            row.insertCell(0).textContent = product.id;
+                            row.insertCell(1).textContent = product.name;
+                            row.insertCell(2).textContent = 'Rp. ' + product.price;
+                            row.insertCell(3).textContent = product.stock;
+
+                            var updateCell = row.insertCell(4);
+                            var updateButton = document.createElement('button');
+                            updateButton.textContent = 'Update';
+                            updateButton.setAttribute('data-product-id', product.id);
+                            updateButton.addEventListener('click', updateProduct);
+                            updateButton.id = 'update_button';
+                            updateCell.appendChild(updateButton);
+
+                            var deleteCell = row.insertCell(5);
+                            var deleteButton = document.createElement('button');
+                            deleteButton.textContent = 'Delete';
+                            deleteButton.setAttribute('data-product-id', product.id);
+                            deleteButton.addEventListener('click', deleteProductConfirmation);
+                            deleteButton.id = 'delete_button';
+                            deleteCell.appendChild(deleteButton);
+                        });
+                    } else {
+                        productList.textContent = 'No products available.';
+                    }
+                });
+        }
+
+        function updateProduct(event) {
+            var productId = event.target.getAttribute('data-product-id');
+            fetch(`http://localhost:8080/product/${productId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + getTokenFromStorage(),
+                },
+            })
+                .then(response => response.json())
+                .then(product => {
+                    document.getElementById('product_id').value = product.id;
+                    document.getElementById('product_name').value = product.name;
+                    document.getElementById('product_price').value = product.price;
+                    document.getElementById('product_stock').value = product.stock;
+
+                    document.getElementById('update_button').style.display = 'inline-block';
+                    document.getElementById('add_button').style.display = 'none';
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function deleteProductConfirmation(event) {
+            var productId = event.target.getAttribute('data-product-id');
+            if (confirm('Are you sure you want to delete this product?')) {
+                deleteProduct(productId);
+            }
+        }
+
+        function deleteProduct(productId) {
+            fetch(`http://localhost:8080/product/${productId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer ' + getTokenFromStorage(),
+                },
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Product deleted successfully!');
+                        fetchProductList();
+                        document.getElementById('product_form').reset();
+                        document.getElementById('update_button').style.display = 'none';
+                        document.getElementById('add_button').style.display = 'inline-block';
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        }
+        document.getElementById('refresh_button').addEventListener('click', function () {
+            fetchProductList();
+            window.location.reload();
+        });
+
+
+        document.getElementById('logout_button').addEventListener('click', function () {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user_id');
+
+            window.location.href = 'index.html';
+        });
+
+        function getTokenFromStorage() {
+            return localStorage.getItem('token');
+        }
+
+        function confirmPayment(transactionId) {
+            fetch(`http://localhost:8080/confirm-payment/${transactionId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + getTokenFromStorage(),
+                },
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        alert(data.message);
+                        fetchUnpaidTransactions();
+                    } else {
+                        alert('Failed to confirm payment.');
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function renderUnpaidTransactions(transactions) {
+            var transactionList = document.getElementById('transaction_list');
+            transactionList.innerHTML = '';
+
+            if (transactions.length > 0) {
+                var table = document.createElement('table');
+                table.id = 'transaction_table';
+                transactionList.appendChild(table);
+
+                var headerRow = table.insertRow();
+                headerRow.innerHTML = '<th>ID</th><th>Amount</th><th>Payment Type</th><th>Confirm</th>';
+
+                var tableBody = document.createElement('tbody');
+                tableBody.id = 'transaction_table_body';
+                table.appendChild(tableBody);
+
+                transactions.forEach(transaction => {
+                    var row = tableBody.insertRow();
+                    row.insertCell(0).textContent = transaction.id;
+                    row.insertCell(1).textContent = transaction.total_amount;
+                    row.insertCell(2).textContent = transaction.payment_type;
+
+                    var confirmCell = row.insertCell(3);
+                    var confirmButton = document.createElement('button');
+                    confirmButton.textContent = 'Confirm Payment';
+                    confirmButton.addEventListener('click', function () {
+                        confirmPayment(transaction.id);
+                    });
+                    confirmCell.appendChild(confirmButton);
+                });
+            } else {
+                transactionList.textContent = 'No unpaid transactions.';
+            }
+        }
+
+        function fetchUnpaidTransactions() {
+            fetch('http://localhost:8080/unpaid-transactions', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + getTokenFromStorage(),
+                },
+            })
+                .then(response => response.json())
+                .then(renderUnpaidTransactions)
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        }
+
+        document.getElementById('refresh_transactions_button').addEventListener('click', function () {
+            fetchUnpaidTransactions();
+        });
+
+        document.addEventListener('DOMContentLoaded', fetchUnpaidTransactions);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            flatpickr('#report_date', {
+                dateFormat: 'Y-m-d',
+                enableTime: false,
+            });
+
+            document.getElementById('generate_report_button').addEventListener('click', function () {
+                generateReport();
+            });
+        });
+
+        function generateReport() {
+            var reportDate = document.getElementById('report_date').value;
+
+            fetch(`http://localhost:8080/report`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + getTokenFromStorage(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ report_date: reportDate }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        alert(data.message);
+                        fetchReportByDate(reportDate);
+                    } else {
+                        alert('Failed to generate report.');
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function fetchReportByDate(reportDate) {
+            fetch(`http://localhost:8080/report/${reportDate}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + getTokenFromStorage(),
+                },
+            })
+                .then(response => response.json())
+                .then(renderReport)
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function renderReport(report) {
+            var reportList = document.getElementById('report_list');
+            reportList.innerHTML = '';
+
+            if (report) {
+                var table = document.createElement('table');
+                reportList.appendChild(table);
+
+                var headerRow = table.insertRow();
+                headerRow.innerHTML = '<th>Total Sales</th><th>Report Date</th><th>Products Sold</th>';
+
+                var tableBody = document.createElement('tbody');
+                table.appendChild(tableBody);
+
+                var formattedTotalSales = 'Rp. ' + report.total_sales.toLocaleString();
+
+                var formattedReportDate = new Date(report.report_date).toLocaleDateString();
+
+                var row = tableBody.insertRow();
+                row.insertCell(0).textContent = formattedTotalSales;
+                row.insertCell(1).textContent = formattedReportDate;
+
+                var productsSoldCell = row.insertCell(2);
+                var productsSold = report.products_sold;
+
+                var productsSoldString = Object.keys(productsSold).map(function (productName) {
+                    return productName + ': ' + productsSold[productName];
+                }).join(', ');
+
+                productsSoldCell.textContent = productsSoldString;
+            } else {
+                reportList.textContent = 'No report available.';
+            }
+        }
+    </script>
+</body>
+
+<style>
+    body {
+        background-color: #f2f2f2;
+    }
+
+    .container {
+        background-color: white;
+    }
+
+    .product-management {
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+    }
+
+    #product_list table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+
+    #product_list th,
+    #product_list td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+
+    #product_list th {
+        background-color: #f2f2f2;
+    }
+
+    #product_form {
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }
+
+    #product_form input[type="text"],
+    #product_form input[type="number"] {
+        width: 15%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-sizing: border-box;
+    }
+
+    #add_button,
+    #update_button,
+    #delete_button,
+    #refresh_button {
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-right: 5px;
+    }
+
+    #add_button {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    #add_button:hover {
+        background-color: #45a049;
+    }
+
+    #update_button {
+        background-color: #3498db;
+        color: white;
+    }
+
+    #update_button:hover {
+        background-color: #2980b9;
+    }
+
+    #delete_button {
+        background-color: #e74c3c;
+        color: white;
+    }
+
+    #delete_button:hover {
+        background-color: #c0392b;
+    }
+
+    #refresh_button {
+        background-color: #3498db;
+        color: white;
+    }
+
+    #refresh_button:hover {
+        background-color: #2980b9;
+    }
+
+    .transaction-management {
+        margin-top: 20px;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 5px;
+    }
+
+    #transaction_list table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+
+    #transaction_list th,
+    #transaction_list td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+
+    #transaction_list th {
+        background-color: #f2f2f2;
+    }
+
+    #transaction_list button {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+
+    #transaction_list button:hover {
+        background-color: #45a049;
+    }
+
+    #refresh_transactions_button {
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+        background-color: #3498db;
+        color: white;
+    }
+
+    #transaction_list button {
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        background-color: #4caf50;
+        color: white;
+    }
+
+    #transaction_list button:hover {
+        background-color: #45a049;
+    }
+
+    .report-management {
+        margin-top: 20px;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 5px;
+    }
+
+    #report_form {
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }
+
+    #generate_report_button {
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        background-color: #3498db;
+        color: white;
+        margin-right: 5px;
+    }
+
+    #generate_report_button:hover {
+        background-color: #2980b9;
+    }
+
+    #report_list table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+
+    #report_list th,
+    #report_list td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+
+    #report_list th {
+        background-color: #f2f2f2;
+    }
+
+    #logout_button {
+        background-color: #f44336;
+        color: white;
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 20px;
+    }
+
+    #logout_button:hover {
+        background-color: #d32f2f;
+    }
+</style>

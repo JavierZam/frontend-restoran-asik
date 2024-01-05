@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Restoran Asik</title>
+</head>
+
+<body style="background-color: #f2f2f2;">
+    <div class="login-container">
+        <h2>Login Restoran Asik</h2>
+
+        <div id="error_message"></div>
+
+        <form id="login_form">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username">
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password">
+
+            <input type="submit" value="Login">
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('login_form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var username = document.getElementById('username').value;
+            var password = document.getElementById('password').value;
+
+            fetch('http://localhost:8080/user/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.token) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user_id', data.user.id);
+
+                        if (data.user.role === 'admin') {
+                            window.location.href = 'admin.html';
+                        } else if (data.user.role === 'customer') {
+                            window.location.href = 'customer.html';
+                        }
+                    } else {
+                        document.getElementById('error_message').textContent = data.error;
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        });
+    </script>
+
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f2f2f2;
+        }
+
+        .login-container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            width: 600px;
+            background-color: white;
+        }
+
+        #login_form {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input {
+            width: 97%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        input[type="submit"] {
+            background-color: #3498db;
+            color: white;
+            padding: 10px;
+            border: none;
+            width: 100%;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #2980b9;
+        }
+
+        #error_message {
+            color: red;
+            margin-bottom: 10px;
+        }
+    </style>
+</body>
+
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Page</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@10">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+</head>
+
+<body>
+    <div class="container">
+        <button id="logout_button">Logout</button>
+        <h2>Product List</h2>
+        <div id="product_list"></div>
+        <h2>Order Form</h2>
+        <form id="order_form">
+            <label for="product_id">Select Product:</label>
+            <select id="product_id" name="product_id"></select>
+            <label for="quantity">Quantity:</label>
+            <input type="number" id="quantity" name="quantity" min="1" required>
+            <label for="payment_type">Payment Type:</label>
+            <select id="payment_type" name="payment_type">
+                <option value="tunai">Tunai</option>
+                <option value="non tunai">Non Tunai</option>
+            </select>
+            <input type="submit" value="Submit">
+        </form>
+    </div>
+
+    <script>
+        // Fetch product list from backend
+        fetch('http://localhost:8080/product', {
+            method: 'GET',
+            headers: {
+                'Authorization': 'Bearer ' + getTokenFromStorage(),
+            },
+        })
+            .then(response => response.json())
+            .then(products => {
+                var productDropdown = document.getElementById('product_id');
+                products.forEach(product => {
+                    var option = document.createElement('option');
+                    option.value = product.id;
+                    option.textContent = product.name + ' - Harga: ' + 'Rp.' + product.price;
+                    productDropdown.appendChild(option);
+                });
+            });
+
+        document.getElementById('order_form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var product_id = Number(document.getElementById('product_id').value);
+            var quantity = Number(document.getElementById('quantity').value);
+            var payment_type = document.getElementById('payment_type').value;
+
+            fetch('http://localhost:8080/transaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + getTokenFromStorage(),
+                },
+                body: JSON.stringify({
+                    "user_id": Number(localStorage.getItem('user_id')),
+                    "product_id": product_id,
+                    "quantity": quantity,
+                    "payment_type": payment_type,
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    var message = payment_type === 'tunai' ?
+                        'Terima Kasih Sudah Memesan, Silahkan Tunggu Admin Untuk Mengkonfirmasi Pesananmu' :
+                        'Terima Kasih Sudah Memesan';
+
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        text: message,
+                        icon: 'success',
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#149ddd',
+                    }).then(() => {
+                        fetch('http://localhost:8080/transaction/' + data.id, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': 'Bearer ' + getTokenFromStorage(),
+                            },
+                        })
+                            .then(response => response.json())
+                            .then(transaction => {
+                                Swal.fire({
+                                    title: 'Detail Transaksi',
+                                    html: 'Nomor Pesanan: ' + transaction.product_id + '<br>' +
+                                        'Quantity: ' + transaction.quantity + '<br>' +
+                                        'Jumlah Harga: Rp.' + transaction.total_amount + '<br>' +
+                                        'Tipe Pembayaran: ' + transaction.payment_type,
+                                    confirmButtonText: 'OK',
+                                    confirmButtonColor: '#149ddd',
+                                });
+                            });
+                    });
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        });
+
+
+
+        document.getElementById('logout_button').addEventListener('click', function () {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user_id');
+
+            window.location.href = 'index.html';
+        });
+
+        function getTokenFromStorage() {
+            return localStorage.getItem('token');
+        }
+    </script>
+</body>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f0f0;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+    }
+
+    .container {
+        width: 80%;
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    #product_list {
+        margin-bottom: 20px;
+    }
+
+    form {
+        background-color: #f8f8f8;
+        padding: 20px;
+        border-radius: 5px;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    #quantity {
+        width: 98.8%;
+    }
+
+    input[type="submit"],
+    button {
+        background-color: #4CAF50;
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 8px 0;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+    input[type="submit"]:hover {
+        background-color: #45a049;
+    }
+
+    select,
+    input[type="number"] {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+    }
+
+    #logout_button {
+        background-color: #f44336;
+        color: white;
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+    #logout_button:hover {
+        background-color: #d32f2f;
+    }
+</style>
+
+</html>
